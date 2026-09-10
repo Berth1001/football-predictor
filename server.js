@@ -32,39 +32,41 @@ const COMPETITIONS = {
 
 app.get("/api/competitions", (req, res) => res.json(COMPETITIONS));
 
+async function getStandingsTable(competition) {
+  const data = await fdFetch(`/competitions/${competition}/standings`);
+  const totalTable = data.standings.find((s) => s.type === "TOTAL") || data.standings[0];
+  return totalTable.table;
+}
+
 app.get("/api/teams", async (req, res) => {
   try {
     const { competition } = req.query;
-    const data = await fdFetch(`/competitions/${competition}/teams`);
-    res.json(data.teams.map((t) => ({ id: t.id, name: t.name })));
+    const table = await getStandingsTable(competition);
+    res.json(table.map((row) => ({ id: row.team.id, name: row.team.name })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-async function getTeamForm(teamId) {
-  const data = await fdFetch(`/teams/${teamId}/matches?status=FINISHED&limit=5`);
-  let points = 0, goalsFor = 0, goalsAgainst = 0;
-  const matches = data.matches || [];
-  matches.forEach((m) => {
-    const isHome = m.homeTeam.id === teamId;
-    const gf = isHome ? m.score.fullTime.home : m.score.fullTime.away;
-    const ga = isHome ? m.score.fullTime.away : m.score.fullTime.home;
-    goalsFor += gf ?? 0;
-    goalsAgainst += ga ?? 0;
-    if (gf > ga) points += 3;
-    else if (gf === ga) points += 1;
-  });
-  const played = matches.length || 1;
-  return { formPoints: points, avgGoalsFor: goalsFor / played, avgGoalsAgainst: goalsAgainst / played, matchesFound: matches.length };
-}
-
 app.get("/api/predict", async (req, res) => {
   try {
-    const { teamAId, teamBId } = req.query;
-    if (!teamAId || !teamBId) return res.status(400).json({ error: "ต้องระบุ teamAId และ teamBId" });
+    const { teamAId, teamBId, competition } = req.query;
+    if (!teamAId || !teamBId || !competition) {
+      return res.status(400).json({ error: "ต้องระบุ teamAId, teamBId และ competition" });
+    }
+    const table = await getStandingsTable(competition);
+    const rowA = table.find((r) => r.team.id === Number(teamAId));
+    const rowB = table.find((r) => r.team.id === Number(teamBId));
+    if (!rowA || !rowB) return res.status(404).json({ error: "ไม่พบทีมในตารางคะแนน" });
 
-    const [formA, formB] = await Promise.all([getTeamForm(Number(teamAId)), getTeamForm(Number(teamBId))]);
+    const statsOf = (row) => ({
+      formPoints: (row.points / row.playedGames) * 5,
+      avgGoalsFor: row.goalsFor / row.playedGames,
+      avgGoalsAgainst: row.goalsAgainst / row.playedGames,
+      matchesFound: row.playedGames,
+    });
+    const formA = statsOf(rowA);
+    const formB = statsOf(rowB);
 
     const homeAdv = 3;
     const strengthA = formA.formPoints * 4 + formA.avgGoalsFor * 10 - formA.avgGoalsAgainst * 4 + homeAdv;
@@ -79,7 +81,6 @@ app.get("/api/predict", async (req, res) => {
       winA = (winA / s) * 0.9;
       winB = (winB / s) * 0.9;
     }
-
     const predA = Math.max(0, Math.round(formA.avgGoalsFor * 0.5 + formB.avgGoalsAgainst * 0.3 + homeAdv / 10));
     const predB = Math.max(0, Math.round(formB.avgGoalsFor * 0.5 + formA.avgGoalsAgainst * 0.3));
 
@@ -88,7 +89,7 @@ app.get("/api/predict", async (req, res) => {
       teamB: { ...formB, winPct: Math.round(winB * 100) },
       drawPct: Math.round(draw * 100),
       predictedScore: { home: predA, away: predB },
-      note: "คำนวณจากฟอร์ม 5 นัดล่าสุดและค่าเฉลี่ยยิง-เสียจริง แต่ไม่ใช่การรับประกันผลลัพธ์",
+      note: "คำนวณจากสถิติฤดูกาลนี้จริง (ตารางคะแนน) แต่ไม่ใช่การรับประกันผลลัพธ์",
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
