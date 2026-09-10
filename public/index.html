@@ -106,4 +106,23 @@ async function predict() {
     document.getElementById('barA').style.width = data.teamA.winPct + '%';
     document.getElementById('barD').style.width = data.drawPct + '%';
     document.getElementById('barB').style.width = data.teamB.winPct + '%';
-    document.getElementById('barA').textContent
+    document.getElementById('barA').textContent= data.teamA.winPct + '%';
+    document.getElementById('barD').textContent = data.drawPct + '%';
+    document.getElementById('barB').textContent = data.teamB.winPct + '%';
+    document.getElementById('labA').textContent = nameA;
+    document.getElementById('labB').textContent = nameB;
+    document.getElementById('scoreOut').textContent = `${nameA} ${data.predictedScore.home} - ${data.predictedScore.away} ${nameB}`;
+    document.getElementById('statsBox').innerHTML = `<div>${nameA}: ยิงเฉลี่ย ${data.teamA.avgGoalsFor.toFixed(1)}/นัด (${data.teamA.matchesFound} นัดล่าสุด)</div><div>${nameB}: ยิงเฉลี่ย ${data.teamB.avgGoalsFor.toFixed(1)}/นัด (${data.teamB.matchesFound} นัดล่าสุด)</div>`;
+    document.getElementById('noteBox').textContent = data.note;
+    document.getElementById('resultCard').style.display = 'block';
+  } catch (err) {
+    errorBox.textContent = 'ทำนายไม่สำเร็จ: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'ทำนายผล';
+  }
+}
+loadCompetitions();
+</script>
+</body>
+</html>
