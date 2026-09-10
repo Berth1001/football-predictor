@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ทายบอล">
+<title>บอททายผลบอล</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; min-height: 100vh; }
+  select, button { min-height: 44px; }
+  .app { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
+  .subtitle { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+  .card { background: #1e293b; border-radius: 14px; padding: 18px; margin-bottom: 16px; border: 1px solid #334155; }
+  label { font-size: 13px; color: #94a3b8; display: block; margin-bottom: 4px; }
+  select { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 14px; margin-bottom: 12px; }
+  button { width: 100%; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  .result { display: none; }
+  .bars { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 12px 0 6px; }
+  .bar { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #0f172a; }
+  .bar-a { background: #38bdf8; } .bar-d { background: #94a3b8; } .bar-b { background: #fb923c; }
+  .legend { display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
+  .score-box { text-align: center; padding: 16px; background: #0f172a; border-radius: 10px; border: 1px solid #334155; }
+  .score-box .score { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; font-size: 12px; color: #94a3b8; }
+  .note { font-size: 12px; color: #64748b; margin-top: 12px; text-align: center; }
+  .error { color: #f87171; font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>⚽ บอททายผลบอล</h1>
+  <p class="subtitle">ดึงฟอร์ม 5 นัดล่าสุดจริงจาก football-data.org</p>
+  <div class="card">
+    <label>ลีก</label>
+    <select id="competition"></select>
+    <label>ทีมเหย้า</label>
+    <select id="teamA"></select>
+    <label>ทีมเยือน</label>
+    <select id="teamB"></select>
+    <button id="predictBtn" onclick="predict()">ทำนายผล</button>
+    <div class="error" id="errorBox"></div>
+  </div>
+  <div class="card result" id="resultCard">
+    <p style="font-size:13px;color:#94a3b8;margin:0 0 4px;">ความน่าจะเป็นผลการแข่งขัน</p>
+    <div class="bars">
+      <div class="bar bar-a" id="barA"></div>
+      <div class="bar bar-d" id="barD"></div>
+      <div class="bar bar-b" id="barB"></div>
+    </div>
+    <div class="legend"><span id="labA"></span><span>เสมอ</span><span id="labB"></span></div>
+    <div class="score-box">
+      <div style="font-size:13px;color:#94a3b8;">สกอร์ที่มีโอกาสสูงสุด</div>
+      <div class="score" id="scoreOut"></div>
+    </div>
+    <div class="stats" id="statsBox"></div>
+    <p class="note" id="noteBox"></p>
+  </div>
+</div>
+<script>
+let teams = [];
+async function loadCompetitions() {
+  const res = await fetch('/api/competitions');
+  const data = await res.json();
+  const sel = document.getElementById('competition');
+  sel.innerHTML = Object.entries(data).map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
+  sel.addEventListener('change', loadTeams);
+  loadTeams();
+}
+async function loadTeams() {
+  const competition = document.getElementById('competition').value;
+  document.getElementById('errorBox').textContent = '';
+  document.getElementById('predictBtn').disabled = true;
+  try {
+    const res = await fetch(`/api/teams?competition=${competition}`);
+    if (!res.ok) throw new Error((await res.json()).error);
+    teams = await res.json();
+    const opts = teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    document.getElementById('teamA').innerHTML = opts;
+    document.getElementById('teamB').innerHTML = opts;
+    if (teams.length > 1) document.getElementById('teamB').selectedIndex = 1;
+    document.getElementById('predictBtn').disabled = false;
+  } catch (err) {
+    document.getElementById('errorBox').textContent = 'โหลดทีมไม่สำเร็จ: ' + err.message;
+  }
+}
+async function predict() {
+  const teamAId = document.getElementById('teamA').value;
+  const teamBId = document.getElementById('teamB').value;
+  const nameA = teams.find(t => t.id == teamAId)?.name || 'ทีม A';
+  const nameB = teams.find(t => t.id == teamBId)?.name || 'ทีม B';
+  const errorBox = document.getElementById('errorBox');
+  errorBox.textContent = '';
+  if (teamAId === teamBId) { errorBox.textContent = 'กรุณาเลือกทีมที่ไม่ซ้ำกัน'; return; }
+  const btn = document.getElementById('predictBtn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังดึงข้อมูล...';
+  try {
+    const res = await fetch(`/api/predict?teamAId=${teamAId}&teamBId=${teamBId}`);
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    document.getElementById('barA').style.width = data.teamA.winPct + '%';
+    document.getElementById('barD').style.width = data.drawPct + '%';
+    document.getElementById('barB').style.width = data.teamB.winPct + '%';
+    document.getElementById('barA').textContent
