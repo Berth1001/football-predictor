@@ -100,6 +100,7 @@ async function predict() {
   btn.disabled = true;
   btn.textContent = 'กำลังดึงข้อมูล...';
   try {const competition = document.getElementById('competition').value;
+    const competition = document.getElementById('competition').value;
     const res = await fetch(`/api/predict?teamAId=${teamAId}&teamBId=${teamBId}&competition=${competition}`);
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
