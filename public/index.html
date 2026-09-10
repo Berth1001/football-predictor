@@ -99,8 +99,8 @@ async function predict() {
   const btn = document.getElementById('predictBtn');
   btn.disabled = true;
   btn.textContent = 'กำลังดึงข้อมูล...';
-  try {
-    const res = await fetch(`/api/predict?teamAId=${teamAId}&teamBId=${teamBId}`);
+  try {const competition = document.getElementById('competition').value;
+    const res = await fetch(`/api/predict?teamAId=${teamAId}&teamBId=${teamBId}&competition=${competition}`);
     if (!res.ok) throw new Error((await res.json()).error);
     const data = await res.json();
     document.getElementById('barA').style.width = data.teamA.winPct + '%';
